@@ -1,0 +1,35 @@
+
+<!doctype html><html><head><meta charset="utf-8"><title>Network IDS SOC Dashboard</title>
+<style>
+body{font-family:Arial;margin:0;background:#0b1220;color:#e5e7eb} header{padding:22px 28px;background:#111827}
+h1{margin:0} .sub{color:#9ca3af;margin-top:6px}.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;padding:20px}
+.card{background:#172033;padding:18px;border-radius:12px}.num{font-size:28px;font-weight:bold;margin-top:8px}
+main{padding:0 20px}.panel{background:#111827;border-radius:12px;padding:18px;margin-bottom:18px}
+table{width:100%;border-collapse:collapse}th,td{padding:10px;border-bottom:1px solid #273244;text-align:left;font-size:13px}
+.badge{padding:4px 8px;border-radius:10px;background:#334155}.high{color:#fca5a5}.medium{color:#fcd34d}
+button{background:#2563eb;color:white;border:0;padding:7px 10px;border-radius:7px;cursor:pointer}
+.bar{height:16px;background:#334155;border-radius:8px;overflow:hidden}.fill{height:100%;background:#60a5fa}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}}
+</style></head><body>
+<header><h1>🛡 Network Intrusion Detection System</h1><div class="sub">Defensive synthetic-flow SOC simulation • localhost only</div></header>
+<div class="grid">
+<div class="card">Total Flows<div class="num" id="total">0</div></div>
+<div class="card">Normal<div class="num" id="normal">0</div></div>
+<div class="card">Suspicious<div class="num" id="susp">0</div></div>
+<div class="card">Open Alerts<div class="num" id="open">0</div></div>
+<div class="card">Critical<div class="num" id="critical">0</div></div>
+<div class="card">Avg Risk<div class="num" id="risk">0</div></div>
+</div>
+<main><div class="panel"><h2>Detection Summary</h2><div id="summary"></div></div>
+<div class="panel"><h2>Recent Alerts</h2><table><thead><tr><th>ID</th><th>Time</th><th>Source</th><th>Alert</th><th>Severity</th><th>Risk</th><th>Status</th><th>Action</th></tr></thead><tbody id="alerts"></tbody></table></div></main>
+<script>
+async function load(){
+ let s=await fetch('/api/dashboard/stats').then(r=>r.json());
+ for(let [id,val] of Object.entries({total:s.total_flows,normal:s.normal,susp:s.suspicious,open:s.open_alerts,critical:s.critical_alerts,risk:s.average_risk})) document.getElementById(id).textContent=val;
+ let html=''; for(let x of s.types){let w=Math.min(100,x.count*5);html+=`<p>${x.alert_type} — ${x.count}</p><div class="bar"><div class="fill" style="width:${w}%"></div></div>`} document.getElementById('summary').innerHTML=html||'No alerts yet. Start the simulator.';
+ let a=await fetch('/api/alerts').then(r=>r.json());
+ document.getElementById('alerts').innerHTML=a.slice(0,30).map(x=>`<tr><td>${x.alert_id}</td><td>${new Date(x.timestamp).toLocaleString()}</td><td>${x.source_ip}</td><td>${x.alert_type}</td><td class="${x.severity.toLowerCase()}">${x.severity}</td><td>${x.risk_score}</td><td>${x.status}</td><td><button onclick="investigate(${x.alert_id})">Investigate</button></td></tr>`).join('');
+}
+async function investigate(id){let st=prompt('Enter status: NEW, INVESTIGATING, RESOLVED, or FALSE_POSITIVE','INVESTIGATING');if(!st)return;await fetch('/api/alerts/'+id+'/status',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({status:st})});let note=prompt('Add analyst note (optional):','Reviewed synthetic event; compare with baseline.');if(note)await fetch('/api/alerts/'+id+'/notes',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({note})});load()}
+load();setInterval(load,3000);
+</script></body></html>
